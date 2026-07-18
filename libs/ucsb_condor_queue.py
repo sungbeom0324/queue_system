@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import subprocess
 import queue_system
 import os
@@ -101,7 +101,7 @@ class ucsb_condor_queue(queue_system.queue_system):
       submission_file.write(submission_string)
 
     # Submit submission script
-    submit_result = subprocess.check_output('condor_submit '+submission_file_path, shell=True)
+    submit_result = subprocess.check_output('condor_submit '+submission_file_path, shell=True, text=True)
     # Example) submit_result = "6 job(s) submitted to cluster 10"
     print(submit_result)
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import argparse
 import nested_dict
 import subprocess
@@ -14,7 +14,7 @@ def initialize_arguments(args):
   for key in args:
     if isinstance(args[key], list) and len(args[key])==1: 
       args[key] = args[key][0]
-      if unicode(args[key]).isnumeric():
+      if str(args[key]).isnumeric():
         args[key] = int(args[key])
   if not args['output_json']:
     folder = os.path.dirname(args['jobs_info_filename'])

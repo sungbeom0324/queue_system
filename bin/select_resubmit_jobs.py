@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import nested_dict
 import subprocess
 import ucsb_condor_queue
@@ -27,7 +27,7 @@ def initialize_arguments(args):
   for key in args:
     if isinstance(args[key], list) and len(args[key])==1: 
       args[key] = args[key][0]
-      if unicode(args[key]).isnumeric():
+      if str(args[key]).isnumeric():
         args[key] = int(args[key])
   if not args['output_json']:
     folder = os.path.dirname(args['jobs_info_filename'])
@@ -66,7 +66,7 @@ def are_arguments_valid(args):
 
 
 #def ask_yn(question, default=None):
-#  answer_yn = raw_input(question)
+#  answer_yn = input(question)
 #  if answer_yn != 'y' and answer_yn != 'n' and answer_yn != '':
 #    print('[Error] Did not enter y or n')
 #    return ask_yn(question, default)
@@ -79,8 +79,8 @@ def are_arguments_valid(args):
 #  return answer_yn
 
 def ask_key_value():
-  key = raw_input('Type key to change: ')
-  value = raw_input('Type changed value: ')
+  key = input('Type key to change: ')
+  value = input('Type changed value: ')
   sure = ask.ask_yn('Are you sure to change keys: '+key+' to value: '+value+'? (y/n) ')
   if sure == 'n': return ask_key_value()
   return key, value

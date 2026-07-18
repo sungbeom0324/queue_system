@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import subprocess
 import zlib
 import re
@@ -6,11 +6,11 @@ import ask
 
 # Compress string to pass things through posix
 def compress_string(string):
-  return zlib.compress(string.encode('utf-8')).encode('hex')
+  return zlib.compress(string.encode('utf-8')).hex()
 
 # Decompress string for passed things through posix
 def decompress_string(compressed_string):
-  return zlib.decompress(compressed_string.decode('hex'))
+  return zlib.decompress(bytes.fromhex(compressed_string)).decode('utf-8')
 
 class queue_system():
   # job_index starts from 1
@@ -120,8 +120,7 @@ class queue_system():
     return commands_info
 
   def chunker(self, seq, size):
-    #return (seq[pos:pos + size] for pos in range(0, len(seq), size)) # python3
-    return (seq[pos:pos + size] for pos in xrange(0, len(seq), size))
+    return (seq[pos:pos + size] for pos in range(0, len(seq), size)) # python3
 
   # commands_info = [[command, job_index]]
   # combined_commands_info = [[[command, job_index]]]
@@ -130,16 +129,16 @@ class queue_system():
     return list(self.chunker(commands_info, number_combined_commands))
  
   def get_number_combined_commands(self):
-    number_combined_commands = raw_input('Number commands to combine (Default: 1) : ')
+    number_combined_commands = input('Number commands to combine (Default: 1) : ')
     if number_combined_commands == '': number_combined_commands = 1
     else:
-      if not unicode(number_combined_commands,'utf-8').isnumeric():
+      if not number_combined_commands.isnumeric():
         print('[Error] '+number_combined_commands+' is not a number.')
         return self.get_number_combined_commands()
     return int(number_combined_commands)
 
   def get_print_or_run(self):
-    print_or_run = raw_input('(p)rint commands or (r)un commands (Default: p) : ')
+    print_or_run = input('(p)rint commands or (r)un commands (Default: p) : ')
     if print_or_run == '': print_or_run = 'p'
     else:
       if print_or_run != 'p' and print_or_run != 'r':

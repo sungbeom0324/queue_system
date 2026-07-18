@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Runs multiple commands, where each argument is a compressed command
 import sys
 import zlib
@@ -8,11 +8,11 @@ import os
 
 # Compress string to pass things through posix
 def compress_string(string):
-  return zlib.compress(string.encode('utf-8')).encode('hex')
+  return zlib.compress(string.encode('utf-8')).hex()
 
 # Decompress string for passed things through posix
 def decompress_string(compressed_string):
-  return zlib.decompress(compressed_string.decode('hex'))
+  return zlib.decompress(bytes.fromhex(compressed_string)).decode('utf-8')
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Helps queue_system to run multiple commands. Runs arguments')

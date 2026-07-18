@@ -1,4 +1,4 @@
-#!/bin/env python
+#!/bin/env python3
 import queue_system
 import argparse
 import subprocess

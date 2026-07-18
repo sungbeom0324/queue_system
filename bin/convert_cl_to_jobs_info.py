@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import subprocess
 import queue_system
 import argparse
@@ -27,7 +27,7 @@ def initialize_arguments(args):
   for key in args:
     if isinstance(args[key], list) and len(args[key])==1: 
       args[key] = args[key][0]
-      if unicode(args[key]).isnumeric():
+      if str(args[key]).isnumeric():
         args[key] = int(args[key])
 
 def are_arguments_valid(args):
@@ -70,7 +70,7 @@ if __name__ == '__main__':
     sys.exit()
 
   jobs_info = [{}]
-  command_list_output = subprocess.check_output(args['command_list_filename'], shell=True)
+  command_list_output = subprocess.check_output(args['command_list_filename'], shell=True, text = True)
   for line in command_list_output.split('\n'):
     if line == '': continue
     # Parse global_key
