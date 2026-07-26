@@ -2,7 +2,8 @@
 import argparse
 import nested_dict
 import subprocess
-import ucsb_condor_queue
+#import ucsb_condor_queue
+import connect_condor_queue
 import queue_system
 import sys
 import os
@@ -58,7 +59,8 @@ if __name__ == '__main__':
 
   # jobs_info = [{'command_script':command_script, 'other_global_key':other_global_key},{'key_for_job':key_for_job},{'key_for_job':key_for_job},...]
   jobs_info = nested_dict.load_json_file(jobs_info_filename)
-  queue = ucsb_condor_queue.ucsb_condor_queue()
+  #queue = ucsb_condor_queue.ucsb_condor_queue()
+  queue = connect_condor_queue.connect_condor_queue()
   # statuses: [status], where status = 'submitted', 'done', 'fail', 'success', 'to_submit'
   node, number_combined_commands, print_or_run = queue.submit_jobs_info(jobs_info, jobs_info_filename, node=node, max_run=max_run)
 

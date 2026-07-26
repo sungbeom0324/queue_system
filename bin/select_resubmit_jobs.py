@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import nested_dict
 import subprocess
-import ucsb_condor_queue
+#import ucsb_condor_queue
+import connect_condor_queue
 import queue_system
 import os
 import argparse
@@ -115,7 +116,8 @@ if __name__ == '__main__':
     sys.exit()
 
 
-  queue = ucsb_condor_queue.ucsb_condor_queue()
+  #queue = ucsb_condor_queue.ucsb_condor_queue()
+  queue = connect_condor_queue.connet_condor_queue()
 
   #jobs_info_filename = 'jsons/auto_fix_checked_mc_2016_jobs_info.json'
   #output_json = 'jsons/auto_fix_checked_mc_2016_jobs_info.json'

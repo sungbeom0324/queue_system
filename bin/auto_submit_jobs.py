@@ -2,12 +2,13 @@
 import sys
 import nested_dict
 import subprocess
-import ucsb_condor_queue
+import connect_condor_queue
 import time
 import queue_system
 import os
 import argparse
 import ask
+import shutil
 # This script depends on the queue system
 
 def which(program):
@@ -77,6 +78,9 @@ if __name__ == '__main__':
   parser.add_argument('-f', '--force_run', action='store_true')
   parser.add_argument('-j', '--jobs_to_combine', metavar='None', nargs=1)
   parser.add_argument('-r', '--max_run', nargs=1)
+  parser.add_argument('-ci', '--input_files', nargs=1, help='Condor input files')
+  parser.add_argument('-co', '--output_files', nargs=1, help='Condor output files')
+  parser.add_argument('-cn', '--ncpus_in_job', nargs=1, help='Number of cpus in job')
   args = vars(parser.parse_args())
 
   initialize_arguments(args)
@@ -99,24 +103,27 @@ if __name__ == '__main__':
   pause_time = args['pause_time']
   node = args['node']
   max_run = args['max_run']
+  input_files = args['input_files']
+  output_files = args['output_files']
+  ncpus_in_job = args['ncpus_in_job']
 
   jobs_info = nested_dict.load_json_file(jobs_info_filename)
   #nested_dict.save_json_file(jobs_info, output_json)
   #jobs_info = nested_dict.load_json_file(output_json)
 
-  queue = ucsb_condor_queue.ucsb_condor_queue()
+  queue = connect_condor_queue.connect_condor_queue()
   if args['force_run']:
       nJobs = queue.get_number_jobs(jobs_info, ['to_submit'])
       if args['jobs_to_combine']: number_combined_commands = int(args['jobs_to_combine'])
       elif nJobs>2000: number_combined_commands = int(nJobs/2000)
       else: number_combined_commands = 1
       print_or_run = 'r'
-      queue.raw_submit_jobs_info(jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run=max_run)
+      queue.raw_submit_jobs_info(jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run=max_run, input_files=input_files, output_files=output_files, ncpus_in_job=ncpus_in_job)
   else:
     # First submit of jobs
     # jobs_info = [{'command_script':command_script, 'other_global_key':other_global_key},{'key_for_job':key_for_job},{'key_for_job':key_for_job},...]
     # statuses: [status], where status = 'submitted', 'done', 'fail', 'success', 'to_submit'
-    node, number_combined_commands, print_or_run  = queue.submit_jobs_info(jobs_info, jobs_info_filename, node=node, max_run=max_run)
+    node, number_combined_commands, print_or_run  = queue.submit_jobs_info(jobs_info, jobs_info_filename, node=node, max_run=max_run, input_files=input_files, output_files=output_files, ncpus_in_job=ncpus_in_job)
     if print_or_run == 'p': 
       sys.exit()
   nested_dict.save_json_file(jobs_info, output_json)
@@ -129,12 +136,13 @@ if __name__ == '__main__':
     queue.check_jobs(jobs_info, ['submitted'], jobscript_check_filename)
     #queue.add_trials_jobs(jobs_info, ['to_submit'])
     queue.fail_max_trials_jobs(jobs_info, ['to_submit'], max_trials)
+    shutil.copy(output_json, f'{output_json}.1')
     nested_dict.save_json_file(jobs_info, output_json)
 
     print('[Info] Before submit')
     queue.print_jobs_status(jobs_info)
 
-    queue.raw_submit_jobs_info(jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run=max_run)
+    queue.raw_submit_jobs_info(jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run=max_run, input_files=input_files, output_files=output_files, ncpus_in_job=ncpus_in_job)
 
     print('[Info] After submit')
     queue.print_jobs_status(jobs_info)

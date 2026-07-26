@@ -6,11 +6,22 @@ import ask
 
 # Compress string to pass things through posix
 def compress_string(string):
-  return zlib.compress(string.encode('utf-8')).hex()
+  #return zlib.compress(string.encode('utf-8')).encode('hex')
+  #temp = zlib.compress(string.encode())
+  ##temp = zlib.compress(str.encode(string))
+  #print('zipped')
+  #print(temp)
+  #print('zip hex')
+  #temphex = temp.hex()
+  #print(temphex)
+  #print('unzipped')
+  #print(zlib.decompress(bytes.fromhex(temphex)).decode())
+  return zlib.compress(string.encode()).hex()
 
 # Decompress string for passed things through posix
 def decompress_string(compressed_string):
-  return zlib.decompress(bytes.fromhex(compressed_string)).decode('utf-8')
+  #return zlib.decompress(compressed_string.decode('hex'))
+  return zlib.decompress(bytes.fromhex(compressed_string)).decode()
 
 class queue_system():
   # job_index starts from 1
@@ -24,7 +35,7 @@ class queue_system():
   # commands_info = [[command, job_index]]
   # Ex) commands_info[x] = [[command_1, job_index_1], [command_2, job_index_2], ...]
   # submission_command_info = [submission_command, [command, job_index]]
-  def get_submission_command_info(self, command_string, node):
+  def get_submission_command_info(self, command_string, node, input_files=None):
     pass
 
   # Should get job_index log using multiple_index and job_identifier
@@ -68,7 +79,7 @@ class queue_system():
       if ('[Info] command_divider : End divided_command[' in job_log_string):
         if check_command:
           try:
-            status_reason_string = subprocess.check_output(check_command, shell=True)
+            status_reason_string = subprocess.check_output(check_command, shell=True, encoding='UTF-8')
           except:
             status_reason_string = '[For queue_system] fail: check script crashed: '+check_command
           job_status, trial_reason = self.get_status_reason(status_reason_string)
@@ -87,10 +98,10 @@ class queue_system():
   # combined_commands_info = [[[command, job_index]]]
   # Ex) combined_commands_info[x] = [[command_1, job_index_1], [command_2, job_index_2], ...]
   # submission_commands_info = [[submission_command, [command, job_index]]]
-  def get_submission_commands_info(self, combined_commands_info, node):
+  def get_submission_commands_info(self, combined_commands_info, node, input_files=None):
     submission_commands_info = []
     for commands_info in combined_commands_info:
-      submission_commands_info.append(self.get_submission_command_info(commands_info, node))
+      submission_commands_info.append(self.get_submission_command_info(commands_info, node, input_files))
     return submission_commands_info
 
   # Handles string, numbers, and lists
@@ -121,6 +132,7 @@ class queue_system():
 
   def chunker(self, seq, size):
     return (seq[pos:pos + size] for pos in range(0, len(seq), size)) # python3
+    #return (seq[pos:pos + size] for pos in xrange(0, len(seq), size))
 
   # commands_info = [[command, job_index]]
   # combined_commands_info = [[[command, job_index]]]
@@ -132,7 +144,7 @@ class queue_system():
     number_combined_commands = input('Number commands to combine (Default: 1) : ')
     if number_combined_commands == '': number_combined_commands = 1
     else:
-      if not number_combined_commands.isnumeric():
+      if not str(number_combined_commands).isnumeric():
         print('[Error] '+number_combined_commands+' is not a number.')
         return self.get_number_combined_commands()
     return int(number_combined_commands)
@@ -165,18 +177,18 @@ class queue_system():
   # Returns 'r' or 'p' if run or printed
   # jobs_info = ({'global_key':global_value},{'command': command for job 1, 'key_for_job':value_for_job1},{'command': command for job 2', key_for_job':value2_for_job2},...)
   # statuses: [status], where status = 'submitted', 'done', 'fail', 'success', 'to_submit'
-  def submit_jobs_info(self, jobs_info, jobs_info_filename, node=None, max_run=None):
+  def submit_jobs_info(self, jobs_info, jobs_info_filename, node=None, max_run=None, input_files=None, output_files=None, ncpus_in_job=None):
     self.initialize_jobs_info(jobs_info)
 
     print('[Info] Number of commands to submit: '+str(self.get_number_jobs(jobs_info, ['to_submit'])))
 
     number_combined_commands = self.get_number_combined_commands()
     print_or_run = self.get_print_or_run()
-    return self.raw_submit_jobs_info(jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run)
+    return self.raw_submit_jobs_info(jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run, input_files, output_files, ncpus_in_job)
 
   # jobs_info = ({'global_key':global_value},{'command': command for job 1, 'key_for_job':value_for_job1},{'command': command for job 2', key_for_job':value2_for_job2},...)
   # statuses: [status], where status = 'submitted', 'done', 'fail', 'success', 'to_submit'
-  def raw_submit_jobs_info(self, jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run=None):
+  def raw_submit_jobs_info(self, jobs_info, node, number_combined_commands, print_or_run, jobs_info_filename, max_run=None, input_files=None, output_files=None, ncpus_in_job=None):
     self.initialize_jobs_info(jobs_info)
 
     # commands_info = [[command, job_index]]
@@ -185,10 +197,10 @@ class queue_system():
     # Ex) combined_commands_info[x] = [[command_1, job_index_1], [command_2, job_index_2], ...]
     combined_commands_info = self.get_combined_commands_info(number_combined_commands, commands_info)
     # submission_commands_info = [[submission_command, [command, job_index]]]
-    submission_commands_info = self.get_submission_commands_info(combined_commands_info, node)
+    submission_commands_info = self.get_submission_commands_info(combined_commands_info, node, input_files)
     
     if print_or_run == 'r':
-      self.submit_jobs(submission_commands_info, jobs_info, jobs_info_filename, node, max_run)
+      self.submit_jobs(submission_commands_info, jobs_info, jobs_info_filename, node, max_run, input_files, output_files, ncpus_in_job)
     elif print_or_run == 'p':
       for submission_command_info in submission_commands_info:
         # submission_command_info = [submission_command, commands_info]
@@ -238,7 +250,7 @@ class queue_system():
     job_identifier_split = job_identifier.split('_')
     return job_identifier_split[0], job_identifier_split[1]
 
-  def check_job(self, jobs_info, statuses, job_check_script, job_index, debug=False):
+  def check_job(self, jobs_info, statuses, job_check_script, job_index, debug=False, force_check=False):
     default_info = jobs_info[0]
     job_info = jobs_info[job_index]
     job_id, multiple_index = self.get_job_id_multiple_index(job_info['job_identifier'])
@@ -249,7 +261,7 @@ class queue_system():
     check_command = self.get_check_command(jobs_info, job_check_script, job_index)
     if debug: print (check_command)
     # If job is not in queue system resubmit
-    if self.does_job_exist(job_id) == False: 
+    if self.does_job_exist(job_id) == False and force_check == False: 
       job_status = 'to_submit'
       trial_reason = "Job not in queue system"
     else: 
@@ -264,11 +276,11 @@ class queue_system():
   # Check jobs in certain statuses 
   # jobs_info = ({'global_key':global_value},{'command': command for job 1, 'key_for_job':value_for_job1},{'command': command for job 2', key_for_job':value2_for_job2},...)
   # statuses: [status], where status = 'submitted', 'done', 'fail', 'success', 'to_submit'
-  def check_jobs(self, jobs_info, statuses, job_check_script=None, debug=False):
+  def check_jobs(self, jobs_info, statuses, job_check_script=None, debug=False, force_check=False):
     self.initialize_jobs_info(jobs_info)
     for job_index_raw, job_info in enumerate(jobs_info[1:]):
       job_index = job_index_raw + 1
-      self.check_job(jobs_info, statuses, job_check_script, job_index, debug)
+      self.check_job(jobs_info, statuses, job_check_script, job_index, debug, force_check)
 
   # Sets trial for jobs in certain statuses 
   # jobs_info = ({'global_key':global_value},{'command': command for job 1, 'key_for_job':value_for_job1},{'command': command for job 2', key_for_job':value2_for_job2},...)
