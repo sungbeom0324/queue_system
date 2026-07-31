@@ -31,19 +31,45 @@ class connect_condor_queue(queue_system.queue_system):
 
     # Making command file
     job_command_string = '#!/bin/bash\n'
+    job_command_string += 'JOB_DIR="$PWD"\n'
+    job_command_string += 'source /cvmfs/cms.cern.ch/cmsset_default.sh\n'
+    job_command_string += 'cd /cvmfs/cms.cern.ch/el9_amd64_gcc12/cms/cmssw/CMSSW_15_0_17/src\n'
+    job_command_string += 'eval "$(scram runtime -sh)"\n'
+    job_command_string += 'cd "$JOB_DIR"\n'
+
+    # Make directories    
+    job_command_string += 'mkdir -p zgamma/raw_pico\n'
+    job_command_string += 'mkdir -p zgamma/wgt_sums\n'
+
     # Untar input files
     for input_file in input_files.split(','):
       input_basename = os.path.basename(input_file)
 
-      if 'tar.gz' in input_file: job_command_string += f'tar -zxvf {input_basename}\n'
+      if input_file.endswith('.tar.gz'): job_command_string += f'tar -zxvf {input_basename}\n'
       elif input_file.endswith('process_nano.exe'):
-        job_command_string += 'mkdir -p run\n'
+        job_command_string += 'mkdir -p ./run\n'
         job_command_string += f'mv {input_basename} run/process_nano.exe\n'
         job_command_string += 'chmod +x run/process_nano.exe\n'
       elif input_file.endswith('sucho_data_list.txt'):
         job_command_string += 'mkdir -p txt/datasets\n'
-        job_command_string += f'mv {input_basename} txt/datasets/sucho_data_list.txt'
-        job_command_string += 'chmod 777 txt/datasets/sucho_data_list.txt'
+        job_command_string += f'mv {input_basename} txt/datasets/sucho_data_list.txt\n'
+        job_command_string += 'chmod 644 txt/datasets/sucho_data_list.txt\n'
+      elif input_file.endswith('Cert_Collisions2023_366442_370790_Golden.json'):
+        job_command_string += 'mkdir -p txt/json\n'
+        job_command_string += f'mv {input_basename} txt/json/Cert_Collisions2023_366442_370790_Golden.json\n'
+        job_command_string += 'chmod 644 txt/json/Cert_Collisions2023_366442_370790_Golden.json\n'
+
+    # Check transferred files
+    job_command_string += '\n'
+    job_command_string += 'echo "[Info] Files in job directory:"\n'
+    job_command_string += 'find . -maxdepth 3 -type f -print\n'
+    job_command_string += '\n'
+
+    # Check shared library resolution before running process_nano.
+    job_command_string += ('echo "[Info] Shared-library check for process_nano.exe:"\n')
+    job_command_string += 'ldd run/process_nano.exe\n'
+    job_command_string += 'if ldd run/process_nano.exe 2>&1 | grep -q "not found"; then exit 1; fi\n'
+    job_command_string += '\n'
 
     # Write commands
     for command_index, command_info in enumerate(commands_info):
@@ -55,6 +81,8 @@ class connect_condor_queue(queue_system.queue_system):
       job_command_string += 'echo [Info] command_divider : command: '+command+'\n'
       job_command_string += command+'\n'
       job_command_string += 'echo [Info] command_divider : End divided_command['+str(command_index)+']\n'
+      job_command_string += 'echo [Info] command_divider : Transfer processed pico to remote T3 storage\n'
+      job_command_string += 'xrdcp -f zgamma/raw_pico/raw_pico_458276d1-ecc0-4e0e-b8d5-bd016136af57.root root://cluster142.knu.ac.kr:1094//store/user/sucho/out_zgamma/raw_pico/\n'
     job_command_string += 'echo [Info] command_divider : Finished\n'
 
 
@@ -89,7 +117,9 @@ class connect_condor_queue(queue_system.queue_system):
     submission_string += '+ProjectName="cms.org.cern"\n'
     submission_string += 'Notification = Never\n'
     submission_string += 'Requirements = HasSingularity\n'
-    submission_string += '+SingularityImage = "/cvmfs/singularity.opensciencegrid.org/cmssw/cms:rhel7"\n'
+    #submission_string += '+SingularityImage = "/cvmfs/singularity.opensciencegrid.org/cmssw/cms:rhel9"\n'
+    #submission_string += '+DesiredOS = "EL9"\n'
+    submission_string += '+SingularityImage = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/cmssw/el9:x86_64"\n'
     submission_string += 'transfer_executable = True\n'
     if input_files:
       #submission_string += 'transfer_input_files = voms_proxy.txt,CMSSW_10_6_26.tar.gz\n'
