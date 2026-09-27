@@ -133,7 +133,22 @@ if __name__ == '__main__':
     print('[Info] Pausing '+str(pause_time)+' sec')
     time.sleep(pause_time)
 
+    # Check Conder schedd availability before checking individual jobs! Solution to temporary SECMAN error.
+    try :
+      subprocess.check_output(
+        "condor_q -limit 1",
+        shell=True,
+        encoding='UTF-8',
+        stderr=subprocess.STDOUT
+        )
+    except subprocess.CalledProcessError as e:
+      print("[Warning] condor_q is unavailable. Skip this check cycle")
+      print(e.output)
+      continue
+
+    print("DEBUG auto_submit: checker =", jobscript_check_filename)
     queue.check_jobs(jobs_info, ['submitted'], jobscript_check_filename)
+
     #queue.add_trials_jobs(jobs_info, ['to_submit'])
     queue.fail_max_trials_jobs(jobs_info, ['to_submit'], max_trials)
     shutil.copy(output_json, f'{output_json}.1')

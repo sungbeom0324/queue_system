@@ -72,26 +72,33 @@ class queue_system():
   # job_log_string is 'not_found' if the file does not exists
   # The ./job_check_script queue_system.compress_string(job_log_string) should return 'success' or 'fail' or 'to_submit' for a job_log_string
   def get_job_status_trial_reason(self, check_command, job_log_string, default_info):
+    # print("DEBUG check_command:", check_command)
+    print(
+    "DEBUG end marker:",
+    '[Info] command_divider : Finished' in job_log_string)
     job_status = 'submitted'
     trial_reason = ''
     if job_log_string != 'not_found':
+      print("DEBUG entered: job_log_string != not_found")
       # If job is finished
-      if ('[Info] command_divider : End divided_command[' in job_log_string):
+      if ('[Info] command_divider : Finished' in job_log_string):
+        print("DEBUG entered: Condor log Finished")
         if check_command:
+          print("DEBUG running checker")
           try:
             status_reason_string = subprocess.check_output(check_command, shell=True, encoding='UTF-8')
           except:
-            status_reason_string = '[For queue_system] fail: check script crashed: '+check_command
+            print("[Error] checker crashed")
+            status_reason_string = '[For queue_system] fail: check script crashed'
           job_status, trial_reason = self.get_status_reason(status_reason_string)
           if job_status != 'fail' and job_status != 'success' and job_status != 'to_submit':
-            print('[Error] Below command gave unkown status: '+repr(job_status)+'. Setting job_status to done.')
-            print('  '+check_command)
             job_status = 'done'
         else:
           job_status = 'done'
       elif '[Error] Job was terminated' in job_log_string:
         job_status = 'fail'
         trial_reason = 'Job was terminated'
+    print("DEBUG returning job_status:", repr(job_status))
     return job_status, trial_reason
 
   # job_index starts from 1
@@ -259,6 +266,8 @@ class queue_system():
     # Return 'not_found' if the file does not exists
     job_log_string = self.get_job_log_string(job_id, multiple_index)
     check_command = self.get_check_command(jobs_info, job_check_script, job_index)
+    # print("DEBUG check_job: check_command =", repr(check_command))
+
     if debug: print (check_command)
     # If job is not in queue system resubmit
     if self.does_job_exist(job_id) == False and force_check == False: 
@@ -266,6 +275,8 @@ class queue_system():
       trial_reason = "Job not in queue system"
     else: 
       job_status, trial_reason = self.get_job_status_trial_reason(check_command, job_log_string, default_info)
+      print("DEBUG check_job: new status =", job_status)
+      print("DEBUG check_job: trial_reason =", repr(trial_reason))
     job_info['job_status'] = job_status
     if trial_reason != '':
       job_info['job_trials_reason'][job_info['job_identifier']] = trial_reason
@@ -277,6 +288,7 @@ class queue_system():
   # jobs_info = ({'global_key':global_value},{'command': command for job 1, 'key_for_job':value_for_job1},{'command': command for job 2', key_for_job':value2_for_job2},...)
   # statuses: [status], where status = 'submitted', 'done', 'fail', 'success', 'to_submit'
   def check_jobs(self, jobs_info, statuses, job_check_script=None, debug=False, force_check=False):
+    print("DEBUG check_jobs: statuses =", statuses)
     self.initialize_jobs_info(jobs_info)
     for job_index_raw, job_info in enumerate(jobs_info[1:]):
       job_index = job_index_raw + 1
@@ -418,6 +430,8 @@ class queue_system():
     if len(job_log_string) > 100000:
       job_log_string = job_log_string[:100000]
     key_string = self.get_key_string(default_info, job_info)
+    print("DEBUG get_check_command: job_index =", job_index)
+    print("DEBUG get_check_command: job_check_script =", repr(job_check_script))
     return job_check_script+' '+compress_string(job_log_string)+' '+compress_string(key_string)
 
   # jobs_info = ({'global_key':global_value},{'command': command for job 1, 'key_for_job':value_for_job1},{'command': command for job 2', key_for_job':value2_for_job2},...)

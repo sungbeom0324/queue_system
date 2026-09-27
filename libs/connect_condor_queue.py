@@ -31,11 +31,22 @@ class connect_condor_queue(queue_system.queue_system):
 
     # Making command file
     job_command_string = '#!/bin/bash\n'
+    job_command_string += 'job_start=$(date +%s)\n' # Time
+    job_command_string += 'echo "[Timing] job_start_time=$job_start"\n' # Time absolute
     job_command_string += 'JOB_DIR="$PWD"\n'
-    job_command_string += 'source /cvmfs/cms.cern.ch/cmsset_default.sh\n'
-    job_command_string += 'cd /cvmfs/cms.cern.ch/el9_amd64_gcc12/cms/cmssw/CMSSW_15_0_17/src\n'
-    job_command_string += 'eval "$(scram runtime -sh)"\n'
-    job_command_string += 'cd "$JOB_DIR"\n'
+
+    # Rucio
+    job_command_string += 'source /cvmfs/cms.cern.ch/rucio/setup-py3.sh\n'
+    job_command_string += 'echo "[Info] Rucio executable: $(which rucio)"\n'
+    job_command_string += 'echo "X509_USER_PROXY=$X509_USER_PROXY"\n'
+    job_command_string += 'rucio whoami || exit 1\n'
+    job_command_string += 'echo "[Info] Rucio transfer tools:"\n'
+    job_command_string += 'which gfal-copy || true\n'
+    job_command_string += 'which xrdcp || true\n'
+    job_command_string += 'which davix-get || true\n'
+    job_command_string += 'gfal-copy --version || true\n'
+    job_command_string += 'xrdcp --version || true\n'
+    job_command_string += '\n'
 
     # Make directories    
     job_command_string += 'mkdir -p zgamma/raw_pico\n'
@@ -50,14 +61,6 @@ class connect_condor_queue(queue_system.queue_system):
         job_command_string += 'mkdir -p ./run\n'
         job_command_string += f'mv {input_basename} run/process_nano.exe\n'
         job_command_string += 'chmod +x run/process_nano.exe\n'
-      elif input_file.endswith('sucho_data_list.txt'):
-        job_command_string += 'mkdir -p txt/datasets\n'
-        job_command_string += f'mv {input_basename} txt/datasets/sucho_data_list.txt\n'
-        job_command_string += 'chmod 644 txt/datasets/sucho_data_list.txt\n'
-      elif input_file.endswith('Cert_Collisions2023_366442_370790_Golden.json'):
-        job_command_string += 'mkdir -p txt/json\n'
-        job_command_string += f'mv {input_basename} txt/json/Cert_Collisions2023_366442_370790_Golden.json\n'
-        job_command_string += 'chmod 644 txt/json/Cert_Collisions2023_366442_370790_Golden.json\n'
 
     # Check transferred files
     job_command_string += '\n'
@@ -65,27 +68,106 @@ class connect_condor_queue(queue_system.queue_system):
     job_command_string += 'find . -maxdepth 3 -type f -print\n'
     job_command_string += '\n'
 
-    # Check shared library resolution before running process_nano.
-    job_command_string += ('echo "[Info] Shared-library check for process_nano.exe:"\n')
-    job_command_string += 'ldd run/process_nano.exe\n'
-    job_command_string += 'if ldd run/process_nano.exe 2>&1 | grep -q "not found"; then exit 1; fi\n'
-    job_command_string += '\n'
-
     # Write commands
     for command_index, command_info in enumerate(commands_info):
       command = command_info[0]
-      #command_with_env = os.environ['JB_QUEUE_SYSTEM_DIR']+'/bin/setcmsenv.sh '+os.environ['CMSSW_BASE']+' '+command
+    
+      # Example command:
+      # ./run/process_nano.exe
+      #   -f f0fa....root
+      #   -i /store/data/Run2023D/.../50000/
+      #   -o ./zgamma/
+      #   --nent 10000
+    
+      nano_file = command.split("-f ")[1].split()[0]
+      nano_lfn_dir = command.split("-i ")[1].split()[0]
+      nano_lfn = nano_lfn_dir + nano_file
+    
+      # Remote path used only for xrdcp.
+      # redirector = "root://cms-xrd-global.cern.ch/"
+      # nano_remote_file = redirector + nano_lfn_dir + nano_file
+    
+      # Preserve the LFN directory structure locally.
+      nano_local_dir = "." + nano_lfn_dir
+      nano_local_file = nano_local_dir + nano_file
+    
+      # Start this divided command. job_log_string begins.
+      job_command_string += 'echo [Info] command_divider : Start divided_command[{}]\n'.format(command_index)
+      job_command_string += 'total_start=$(date +%s)\n' # Time
+    
+      # Prepare input NanoAOD using xrdcp.
+      job_command_string += 'echo "[Info] Create local NanoAOD directory: {}"\n'.format(nano_local_dir)
+      job_command_string += 'mkdir -p "{}"\n'.format(nano_local_dir)
+      #job_command_string += 'echo "[Info] Copy NanoAOD input from XRootD"\n'
+      #job_command_string += 'xrdcp -f "{}" "{}" || exit 1\n'.format(
+      #    nano_remote_file,
+      #    nano_local_file
+      #)
+      job_command_string += 'download_start=$(date +%s)\n' # Time
+      job_command_string += 'echo "[Info] Copy NanoAOD input from Rucio"\n'
+      job_command_string += (
+                             'timeout 1h rucio download --dir . --no-subdir "cms:{}" '
+                             '|| {{ echo "[Error] rucio download nano failed or timed out"; exit 1; }}\n'
+                             ).format(nano_lfn)
+      job_command_string += 'download_end=$(date +%s)\n' # Time
+      job_command_string += 'echo "[Timing] download_sec=$((download_end-download_start))"\n' # Time
+      job_command_string += 'echo "[Info] Copy done from Rucio."\n'
+      job_command_string += 'echo "[Info] Check downloaded NanoAOD:"\n'
+      job_command_string += 'find "$JOB_DIR" -type f -name "{}" -ls\n'.format(nano_file)
+      job_command_string += 'find "{}" -maxdepth 3 -type f -name "*.root" -ls\n'.format(nano_local_dir)
 
-      job_command_string += 'echo [Info] command_divider : Start divided_command['+str(command_index)+']\n'
-      job_command_string += 'echo [Info] command_divider : Current directory: '+os.getcwd()+'\n'
-      job_command_string += 'echo [Info] command_divider : command: '+command+'\n'
-      job_command_string += command+'\n'
-      job_command_string += 'echo [Info] command_divider : End divided_command['+str(command_index)+']\n'
-      job_command_string += 'echo [Info] command_divider : Transfer processed pico to remote T3 storage\n'
-      job_command_string += 'xrdcp -f zgamma/raw_pico/raw_pico_458276d1-ecc0-4e0e-b8d5-bd016136af57.root root://cluster142.knu.ac.kr:1094//store/user/sucho/out_zgamma/raw_pico/\n'
-    job_command_string += 'echo [Info] command_divider : Finished\n'
+      # Replace LFN input directory with local input directory.
+      local_command = command.replace(
+          nano_lfn_dir,
+          nano_local_dir,
+          1
+      )
+    
+      # CMSSW
+      job_command_string += 'source /cvmfs/cms.cern.ch/cmsset_default.sh\n'
+      job_command_string += 'cd /cvmfs/cms.cern.ch/el9_amd64_gcc12/cms/cmssw/CMSSW_15_0_17/src\n'
+      job_command_string += 'eval "$(scram runtime -sh)"\n'
+      job_command_string += 'cd "$JOB_DIR"\n'
+      # Check shared library resolution before running process_nano.
+      job_command_string += ('echo "[Info] Shared-library check for process_nano.exe:"\n')
+      job_command_string += 'ldd run/process_nano.exe\n'
+      job_command_string += 'if ldd run/process_nano.exe 2>&1 | grep -q "not found"; then exit 1; fi\n'
+      job_command_string += '\n'
+      # Run process_nano.
+      job_command_string += 'echo [Info] command_divider : Current directory: "$PWD"\n'
+      job_command_string += 'echo [Info] command_divider : command: ' + local_command + '\n'
+      job_command_string += 'process_start=$(date +%s)\n' # Time
+      job_command_string += local_command + ' || { echo "[Error] process_nano failed"; exit 1; }\n'
+      job_command_string += 'process_end=$(date +%s)\n' # Time
+      job_command_string += 'echo "[Timing] process_nano_sec=$((process_end-process_start))"\n' # Time
+    
+      job_command_string += 'echo [Info] command_divider : End divided_command[{}]\n'.format(command_index)
+    
+      # Transfer output pico.
+      job_command_string += 'echo [Info] command_divider : Transfer processed pico of divided_command[{}] to remote T3 storage\n'.format(command_index)
+      job_command_string += 'transfer_start=$(date +%s)\n' # Time
+      job_command_string += (
+                             'xrdcp -f zgamma/raw_pico/raw_pico_*__{} '
+                             'root://cluster142.knu.ac.kr:1094//store/user/sucho/out_zgamma/raw_pico/ '
+                             '|| {{ echo "[Error] xrdcp transfer pico failed"; exit 1; }}\n'
+                             ).format(nano_file)
+      job_command_string += 'transfer_end=$(date +%s)\n' # Time
+      job_command_string += 'echo "[Timing] transfer_sec=$((transfer_end-transfer_start))"\n' # Time
+      job_command_string += 'total_end=$(date +%s)\n' # Time
+      job_command_string += 'echo "[Timing] total_sec=$((total_end-total_start))"\n' # Time
+      job_command_string += 'echo [Info] command_divider : Transfer done for divided_command[{}]\n'.format(command_index)
 
+      # Unset CMSSW and reset Rucio for next divided command. This is needed to prevent env crash between Rucio & CMSSW.
+      job_command_string += 'echo "[Info] Unset CMSSW environment"\n'
+      job_command_string += 'eval "$(scram unsetenv -sh)"\n'
+      job_command_string += 'source /cvmfs/cms.cern.ch/rucio/setup-py3.sh\n'
+    
+    job_command_string += 'job_end=$(date +%s)\n' # Time
+    job_command_string += 'echo "[Timing] job_end_time=$job_end"\n' # Time absoulte
+    job_command_string += 'echo "[Timing] job_total_sec=$((job_end-job_start))"\n' # Time
+    job_command_string += 'echo [Info] command_divider : Finished\n' # All divided commands finished and transferred to destination SE.
 
+    
     # Write command file to file
     with open(job_command_file_path, 'w') as job_command_file:
       job_command_file.write(job_command_string)
@@ -121,6 +203,7 @@ class connect_condor_queue(queue_system.queue_system):
     #submission_string += '+DesiredOS = "EL9"\n'
     submission_string += '+SingularityImage = "/cvmfs/unpacked.cern.ch/registry.hub.docker.com/cmssw/el9:x86_64"\n'
     submission_string += 'transfer_executable = True\n'
+    submission_string += 'use_x509userproxy = true\n'
     if input_files:
       #submission_string += 'transfer_input_files = voms_proxy.txt,CMSSW_10_6_26.tar.gz\n'
       submission_string += f'transfer_input_files = {input_files}\n'
@@ -154,9 +237,18 @@ class connect_condor_queue(queue_system.queue_system):
       submission_file.write(submission_string)
 
     # Submit submission script
-    submit_result = subprocess.check_output('condor_submit '+submission_file_path, shell=True, encoding='UTF-8')
-    # Example) submit_result = "6 job(s) submitted to cluster 10"
-    print(submit_result)
+    # submit_result = subprocess.check_output('condor_submit '+submission_file_path, shell=True, encoding='UTF-8')
+    try :
+      submit_result = subprocess.check_output(
+              'condor_submit '+submission_file_path, shell=True, encoding='UTF-8', stderr=subprocess.STDOUT
+              )
+    except subprocess.CalledProcessError as e:
+      print("[Warning] condor_submit failed.")
+      print(e.output)
+      print("[Warning] Jobs remain to_submit and will be retried in the next cycle.")
+      return
+    
+    print(submit_result) # Example) submit_result = "6 job(s) submitted to cluster 10"
 
     # Change job_info
     cluster = re.search('cluster (\d+)', submit_result).group(1) 
@@ -199,32 +291,70 @@ class connect_condor_queue(queue_system.queue_system):
 
   # Should get job_index log using multiple_index and job_id.
   # Return 'not_found' if the file does not exists
+
   def get_job_log_string(self, job_id, multiple_index):
-    log_path = 'logs/out.'+job_id
+  
+    log_path = 'logs/out.' + job_id
     log_string = 'not_found'
+  
+    print("DEBUG cwd:", os.getcwd())
+    print("DEBUG log_path:", os.path.abspath(log_path))
+    print("DEBUG job_id:", job_id)
+    print("DEBUG multiple_index:", repr(multiple_index))
+  
     if os.path.exists(log_path):
-      # Divide according to below.
+  
+      # Divide according to:
+      #
       # [Info] command_divider : Start divided_command[multiple_index]
+      # ...
       # [Info] command_divider : End divided_command[multiple_index]
+  
       log_string = ''
       log_start = False
       log_end = False
+  
       with open(log_path) as log_file:
+  
         for line in log_file:
-          if '[Info] command_divider : Start divided_command['+multiple_index+']' in line: log_start = True
-          if '[Info] command_divider : End divided_command['+multiple_index+']' in line: log_end = True
-          if 'Terminated\n' == line: 
-            log_string += '[Error] Job was terminated. job_id: '+str(job_id)+' multiple_index: '+str(multiple_index)+'.'
+  
+          if '[Info] command_divider : Start divided_command[' + multiple_index + ']' in line:
+            log_start = True
+            print("DEBUG found START")
+          if '[Info] command_divider : Transfer done for divided_command[' + multiple_index + ']' in line:
+            log_end = True
+            print("DEBUG found END")
+  
+          if 'Terminated\n' == line:
+            log_string += (
+              '[Error] Job was terminated. job_id: '
+              + str(job_id)
+              + ' multiple_index: '
+              + str(multiple_index)
+              + '.'
+            )
             return log_string
-          if log_start: log_string += line
-          if log_end: break
+  
+          if log_start:
+            log_string += line
+  
+          if log_end:
+            break
+  
+      print("DEBUG log_start:", log_start)
+      print("DEBUG log_end:", log_end)
+      print("DEBUG get_job_log_string: return =", repr(log_string))
+  
       if log_start == False or log_end == False:
         log_string = 'not_found'
-        #log_string = "[Error] Couldn't find log_start: "+str(log_start)+" or log_end:"+str(log_end)+'\n'
-        #with open(log_path) as log_file:
-        #  log_string += log_file.read()
+  
+    else:
+      print("DEBUG log file does not exist")
+  
+    print("DEBUG return log_string:", repr(log_string))
+  
     return log_string
-
+  
   def does_job_exist(self, job_id):
     # Check factory
     cluster_id, process_id = job_id.split('.')
