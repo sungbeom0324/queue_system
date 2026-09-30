@@ -81,23 +81,35 @@ class queue_system():
     if job_log_string != 'not_found':
       print("DEBUG entered: job_log_string != not_found")
       # If job is finished
-      if ('[Info] command_divider : Finished' in job_log_string):
-        print("DEBUG entered: Condor log Finished")
+      if ('[Info] command_divider : Transfer done for divided_command[' in job_log_string):
         if check_command:
-          print("DEBUG running checker")
+          # print("DEBUG running checker: ", check_command)
           try:
             status_reason_string = subprocess.check_output(check_command, shell=True, encoding='UTF-8')
-          except:
-            print("[Error] checker crashed")
+            print("DEBUG checker returned:", repr(status_reason_string))
+          except Exception as e:
+            print("[Error] checker crashed:", repr(e))
             status_reason_string = '[For queue_system] fail: check script crashed'
           job_status, trial_reason = self.get_status_reason(status_reason_string)
           if job_status != 'fail' and job_status != 'success' and job_status != 'to_submit':
             job_status = 'done'
         else:
           job_status = 'done'
+      elif '[Error] rucio download nano failed or timed out' in job_log_string:
+        job_status = 'to_submit'
+        trial_reason = 'rucio download failed'
+      elif '[Error] process_nano failed' in job_log_string:
+        job_status = 'to_submit'
+        trial_reason = 'process_nano failed'
+      elif '[Error] xrdcp transfer pico failed' in job_log_string:
+        job_status = 'to_submit'
+        trial_reason = 'transfer pico failed'
       elif '[Error] Job was terminated' in job_log_string:
-        job_status = 'fail'
+        job_status = 'to_submit'
         trial_reason = 'Job was terminated'
+      elif '[Error]' in job_log_string:
+        job_status = 'to_submit'
+        trial_reason = 'Error occured'
     print("DEBUG returning job_status:", repr(job_status))
     return job_status, trial_reason
 

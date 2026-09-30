@@ -130,7 +130,7 @@ class connect_condor_queue(queue_system.queue_system):
       job_command_string += 'cd "$JOB_DIR"\n'
       # Check shared library resolution before running process_nano.
       job_command_string += ('echo "[Info] Shared-library check for process_nano.exe:"\n')
-      job_command_string += 'ldd run/process_nano.exe\n'
+      #job_command_string += 'ldd run/process_nano.exe\n'
       job_command_string += 'if ldd run/process_nano.exe 2>&1 | grep -q "not found"; then exit 1; fi\n'
       job_command_string += '\n'
       # Run process_nano.
@@ -343,7 +343,7 @@ class connect_condor_queue(queue_system.queue_system):
   
       print("DEBUG log_start:", log_start)
       print("DEBUG log_end:", log_end)
-      print("DEBUG get_job_log_string: return =", repr(log_string))
+      # print("DEBUG get_job_log_string: return =", repr(log_string))
   
       if log_start == False or log_end == False:
         log_string = 'not_found'
@@ -351,7 +351,7 @@ class connect_condor_queue(queue_system.queue_system):
     else:
       print("DEBUG log file does not exist")
   
-    print("DEBUG return log_string:", repr(log_string))
+    # print("DEBUG return log_string:", repr(log_string))
   
     return log_string
   

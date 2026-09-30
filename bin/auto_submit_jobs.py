@@ -35,8 +35,8 @@ def initialize_arguments(args):
     folder = os.path.dirname(args['jobs_info_filename'])
     filename = os.path.basename(args['jobs_info_filename'])
     args['output_json'] = os.path.join(folder,'auto_'+filename)
-  if not args['max_trials']: args['max_trials'] = 10
-  if not args['pause_time']: args['pause_time'] = 60
+  if not args['max_trials']: args['max_trials'] = 3 #10
+  if not args['pause_time']: args['pause_time'] = 10 #60
   if not args['jobscript_check_filename']: args['jobscript_check_filename'] = 'jobscript_check.py'
 
 def are_arguments_valid(args):
