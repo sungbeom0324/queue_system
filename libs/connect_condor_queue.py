@@ -345,7 +345,7 @@ class connect_condor_queue(queue_system.queue_system):
       print("DEBUG log_end:", log_end)
       # print("DEBUG get_job_log_string: return =", repr(log_string))
   
-      if log_start == False or log_end == False:
+      if log_start == False:
         log_string = 'not_found'
   
     else:
