@@ -125,7 +125,7 @@ class connect_condor_queue(queue_system.queue_system):
     
       # CMSSW
       job_command_string += 'source /cvmfs/cms.cern.ch/cmsset_default.sh\n'
-      job_command_string += 'cd /cvmfs/cms.cern.ch/el9_amd64_gcc12/cms/cmssw/CMSSW_15_0_17/src\n'
+      job_command_string += 'cd /cvmfs/cms.cern.ch/el9_amd64_gcc12/cms/cmssw/CMSSW_14_2_2/src\n'
       job_command_string += 'eval "$(scram runtime -sh)"\n'
       job_command_string += 'cd "$JOB_DIR"\n'
       # Check shared library resolution before running process_nano.
